@@ -1,2 +1,0 @@
-# SQlreplicationautomation
-SQlreplicationautomation
