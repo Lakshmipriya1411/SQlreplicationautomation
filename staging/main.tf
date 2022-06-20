@@ -15,63 +15,127 @@ provider "aws" {
   region = var.region
 }
 
-resource "random_pet" "petname" {
-  length    = 4
-  separator = "-"
+
+# //********ssh key generation
+
+resource "tls_private_key" "keygen" {
+  algorithm   = "RSA"  
 }
 
-resource "aws_s3_bucket" "staging" {
-  bucket = "${var.staging_prefix}-${random_pet.petname.id}"
+//*********Creating key pair in aws
 
-  force_destroy = true
+resource "aws_key_pair" "newKey" {
+depends_on=[
+	tls_private_key.keygen
+]
+  key_name   = "webkey1"
+  public_key = tls_private_key.keygen.public_key_openssh
 }
 
-resource "aws_s3_bucket_website_configuration" "staging" {
-  bucket = aws_s3_bucket.staging.id
+//**********Saving private key in local file
 
-  index_document {
-    suffix = "index.html"
+resource "local_file" "privatekey" {
+depends_on=[
+	aws_key_pair.newKey
+]
+    content     = tls_private_key.keygen.private_key_pem
+    filename = "C:/Users/lgundlapalli/Downloads/webkey1.pem"
+}
+
+resource "aws_default_vpc" "default" {
+  # Default is true, if you omit this, TF will enable it.
+  enable_dns_support = false
+}
+resource "aws_instance" "ami_ec2_test" {  
+  ami = var.ami
+  associate_public_ip_address = var.associate_public_ip_address
+  availability_zone = var.availability_zone
+  cpu_core_count = 8
+  cpu_threads_per_core = 1
+  capacity_reservation_specification {    
+    capacity_reservation_preference = var.capacity_reservation_preference
   }
 
-  error_document {
-    key = "error.html"
+
+  #disable_api_termination = each.value.disable_api_termination
+  
+  ebs_block_device {
+    #delete_on_termination = each.value.delete_on_termination
+    device_name = var.device_name
+    encrypted = var.encrypted
+    #iops = var.iops
+    kms_key_id = var.kms_key_id
+   # snapshot_id = each.value.snapshot_id
+    tags = var.tags
+    volume_size = var.volume_size
+    volume_type = var.volume_type
+  }
+
+  #ebs_optimized = each.value.ebs_optimized
+  #get_password_data = each.value.get_password_data
+  #hibernation = each.value.hibernation
+  host_id = var.host_id
+  iam_instance_profile = var.iam_instance_profile
+  instance_type = var.instance_type
+  key_name = var.key_name
+  #monitoring = each.value.monitoring
+  #private_ip = var.private_ip
+  #secondary_private_ips = var.secondary_private_ips
+  security_groups = var.security_groups
+  #source_dest_check = each.value.source_dest_check
+  subnet_id = var.subnet_id
+  tenancy = var.tenancy
+  tags = {
+    Name ="ec2_ami_test"
+    Environment = "DEV"
+    OS = "Windows"    
   }
 }
 
-resource "aws_s3_bucket_acl" "staging" {
-  bucket = aws_s3_bucket.staging.id
+# resource "aws_volume_attachment" "ebs_att1" {
+#   device_name = "/dev/sda1"
+#   volume_id   = aws_ebs_volume.vol1.id
+#   instance_id = aws_instance.ami_ec2_test.id
+# }
 
-  acl = "public-read"
-}
+# resource "aws_volume_attachment" "ebs_att2" {
+#   device_name = "xvdl"
+#   volume_id   = aws_ebs_volume.vol2.id
+#   instance_id = aws_instance.ami_ec2_test.id
+# }
 
-resource "aws_s3_bucket_policy" "staging" {
-  bucket = aws_s3_bucket.staging.id
-  policy = <<EOF
-{
-    "Version": "2012-10-17",
-    "Statement": [
-        {
-            "Sid": "PublicReadGetObject",
-            "Effect": "Allow",
-            "Principal": "*",
-            "Action": [
-                "s3:GetObject"
-            ],
-            "Resource": [
-                "arn:aws:s3:::${aws_s3_bucket.staging.id}/*"
-            ]
-        }
-    ]
-}
-EOF
-}
+# resource "aws_ebs_volume" "vol1" {
+#   availability_zone = "us-west-2a"
+#   encrypted              = true
+#   snapshot_id = var.snapshot_id
+#   #size = 100
+#   type = "gp2"
+#   kms_key_id = var.kms_key_id
+#   tags = {
+#             "Name": "stg-usw2a-gfwsl-mssql-01", 
+#             "Application": "gfwsl",            
+#             "Env":"stg"
+#          }
+# }
 
-resource "aws_s3_object" "staging" {
-  acl          = "public-read"
-  key          = "index.html"
-  bucket       = aws_s3_bucket.staging.id
-  content      = file("${path.module}/../assets/index.html")
-  content_type = "text/html"
-}
+# resource "aws_ebs_volume" "vol2" {
+#   availability_zone = "us-west-2a"
+#   encrypted              = true
+#   snapshot_id = var.snapshot_id
+#   size = 50
+#   type = "gp3"
+#   iops = 3000
+#   kms_key_id = var.kms_key_id
+#   tags = {
+#             "Name": "stg-usw2a-gfwsl-mssql-01", 
+#             "Application": "gfwsl",            
+#             "Env":"stg"
+#          }
+# }
 
 
+# resource "aws_network_interface_attachment" "test" {
+#   instance_id          = aws_instance.ami_ec2_test.id
+#   network_interface_id = var.network_interface_id
+#   device_index         = 0
+# }
